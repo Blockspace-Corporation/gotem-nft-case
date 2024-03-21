@@ -99,7 +99,7 @@ pub mod case {
 
         #[ink(message)]
         pub fn set_case(&mut self, case: CaseNFT) {
-            let length = (self.case.len() as u32).checked_add(1).unwrap();
+            let length: Id = (self.case.len() as Id).checked_add(1).unwrap();
             self.case.insert(length, case);
         }
 
@@ -114,7 +114,7 @@ pub mod case {
 
         #[ink(message)]
         pub fn update_case(&mut self, case_id: Id, new_case: CaseNFT) -> Result<(), Error> {
-            let case = self
+            let case: &mut CaseNFT = self
                 .case
                 .get_mut(&case_id)
                 .ok_or(Error::CaseNotFound)?;
@@ -125,7 +125,7 @@ pub mod case {
         #[ink(message)]
         pub fn get_case_by_id(&self, case_id: Id) -> Option<CaseNFTOutput> {
             if let Some(case) = self.case.get(&case_id) {
-                let case = CaseNFTOutput::get_case(case_id, case);
+                let case: CaseNFTOutput = CaseNFTOutput::get_case(case_id, case);
                 Some(case)
             } else {
                 None
@@ -134,7 +134,7 @@ pub mod case {
 
         #[ink(message)]
         pub fn get_all_case(&self) -> Vec<CaseNFTOutput> {
-            let case = self
+            let case: Vec<CaseNFTOutput> = self
                 .case
                 .iter()
                 .map(|(case_id, case)| CaseNFTOutput::get_case(*case_id, case))
@@ -145,7 +145,7 @@ pub mod case {
         #[ink(message)]
         pub fn get_case_title(&self, case_id: Id) -> Option<String> {
             if let Some(case) = self.case.get(&case_id) {
-                let case_title = case.title.clone();
+                let case_title: String = case.title.clone();
                 Some(case_title)
             } else {
                 None
