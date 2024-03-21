@@ -17,16 +17,29 @@ pub mod case {
         Encode,
     };
 
-    pub type CaseId = u32;
+    pub type Id = u32;
 
     #[ink(storage)]
     pub struct Case {
-        pub case: BTreeMap<CaseId, CaseNFT>,
+        pub case: BTreeMap<Id, CaseNFT>,
     }
 
     #[derive(Encode, Decode, Debug)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct CaseNFT {
+        pub title: String,
+        pub description: String,
+        pub category: Category,
+        pub owner: AccountId,
+        pub bounty: Balance,
+        pub file: Hash,
+        pub status: Status,
+    }
+
+    #[derive(Encode, Decode, Debug)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub struct CaseNFTOutput {
+        pub case_id: Id,
         pub title: String,
         pub description: String,
         pub category: Category,
@@ -55,9 +68,16 @@ pub mod case {
         Close,
     }
 
-    impl CaseNFT {
-        fn get_case(case: &CaseNFT) -> CaseNFT {
-            CaseNFT {
+    #[derive(Encode, Decode, Debug, PartialEq, Eq, Copy, Clone)]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub enum Error {
+        CaseNotFound,
+    }
+
+    impl CaseNFTOutput {
+        fn get_case(case_id: Id, case: &CaseNFT) -> CaseNFTOutput {
+            CaseNFTOutput {
+                case_id: case_id.clone(),
                 title: case.title.clone(),
                 description: case.description.clone(),
                 category: case.category.clone(),
@@ -84,9 +104,28 @@ pub mod case {
         }
 
         #[ink(message)]
-        pub fn get_case_by_id(&self, case_id: CaseId) -> Option<CaseNFT> {
+        pub fn burn_case(&mut self, case_id: Id) -> Result<(), Error> {
+            if !self.case.contains_key(&case_id) {
+                return Err(Error::CaseNotFound)
+            };
+            self.case.remove(&case_id);
+            Ok(())
+        }
+
+        #[ink(message)]
+        pub fn update_case(&mut self, case_id: Id, new_case: CaseNFT) -> Result<(), Error> {
+            let case = self
+                .case
+                .get_mut(&case_id)
+                .ok_or(Error::CaseNotFound)?;
+            *case = new_case;
+            Ok(())
+        }
+
+        #[ink(message)]
+        pub fn get_case_by_id(&self, case_id: Id) -> Option<CaseNFTOutput> {
             if let Some(case) = self.case.get(&case_id) {
-                let case = CaseNFT::get_case(case);
+                let case = CaseNFTOutput::get_case(case_id, case);
                 Some(case)
             } else {
                 None
@@ -94,17 +133,27 @@ pub mod case {
         }
 
         #[ink(message)]
-        pub fn get_all_case(&self) -> Vec<CaseNFT> {
+        pub fn get_all_case(&self) -> Vec<CaseNFTOutput> {
             let case = self
                 .case
                 .iter()
-                .map(|(_id, case)| CaseNFT::get_case(case))
+                .map(|(case_id, case)| CaseNFTOutput::get_case(*case_id, case))
                 .collect();
             case
         }
 
         #[ink(message)]
-        pub fn get_case_id(&self, case_id: CaseId) -> CaseId {
+        pub fn get_case_title(&self, case_id: Id) -> Option<String> {
+            if let Some(case) = self.case.get(&case_id) {
+                let case_title = case.title.clone();
+                Some(case_title)
+            } else {
+                None
+            }
+        }
+
+        #[ink(message)]
+        pub fn get_case_id(&self, case_id: Id) -> Id {
             if self.case.get(&case_id).is_some() {
                 case_id
             } else {
