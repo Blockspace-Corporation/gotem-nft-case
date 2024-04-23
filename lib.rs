@@ -49,7 +49,7 @@ pub mod case {
         pub status: Status,
     }
 
-    #[derive(Encode, Decode, Debug, Clone)]
+    #[derive(Encode, Decode, Debug, Clone, PartialEq, Copy)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum Category {
         Scam,
@@ -57,15 +57,17 @@ pub mod case {
         Person,
         ConspiracyTheory,
         Others,
+        All,
     }
 
-    #[derive(Encode, Decode, Debug, Clone)]
+    #[derive(Encode, Decode, Debug, Clone, PartialEq, Copy)]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum Status {
         New,
         Evidence,
         Voting,
         Close,
+        All,
     }
 
     #[derive(Encode, Decode, Debug, PartialEq, Eq, Copy, Clone)]
@@ -99,8 +101,12 @@ pub mod case {
 
         #[ink(message)]
         pub fn set_case(&mut self, case: CaseNFT) {
-            let length: Id = (self.case.len() as Id).checked_add(1).unwrap();
-            self.case.insert(length, case);
+            let last_case: &u32 = match self.case.last_key_value() {
+                Some(data) => data.0,
+                None => &0,
+            };
+            let last_id: u32 = last_case.checked_add(1).unwrap();
+            self.case.insert(last_id, case);
         }
 
         #[ink(message)]
@@ -132,14 +138,36 @@ pub mod case {
             }
         }
 
+        // Pagination
+        // Get cases which match the page number,
+        // entries, keyword, category, and status.
+        // Return data is (vec, total cases).
         #[ink(message)]
-        pub fn get_all_case(&self) -> Vec<CaseNFTOutput> {
-            let case: Vec<CaseNFTOutput> = self
-                .case
-                .iter()
-                .map(|(case_id, case)| CaseNFTOutput::get_case(*case_id, case))
-                .collect();
-            case
+        pub fn get_all_case(
+            &self, 
+            page: Id, 
+            entry: Id, 
+            keyword: String, 
+            category: Category, 
+            status: Status
+        ) -> (Vec<CaseNFTOutput>, Id) {
+            let mut filtered_cases: Vec<CaseNFTOutput> = Vec::new();
+            let mut total_cases: Id = 0;
+            let page = if page < 1 { 1 } else { page };
+            let start_index = (page - 1) * entry;
+            let end_index = start_index + entry;
+            for (case_id, case) in self.case.range(..) {
+                if Self::case_contains_keywords(case, &keyword)
+                    && Self::category_matches(case, category)
+                    && Self::status_matches(case, status)
+                {
+                    total_cases += 1;
+                    if total_cases > start_index && total_cases <= end_index {
+                        filtered_cases.push(CaseNFTOutput::get_case(*case_id, case));
+                    }
+                }
+            }
+            (filtered_cases, total_cases)
         }
 
         #[ink(message)]
@@ -167,6 +195,28 @@ pub mod case {
                 panic!("Failed to `set_code_hash` to {code_hash:?} due to {err:?}")
             });
             ink::env::debug_println!("Switched code hash to {:?}.", code_hash);
+        }
+
+        fn case_contains_keywords(case: &CaseNFT, keyword: &String) -> bool {
+            case.title.contains(keyword) || case.description.contains(keyword)
+        }
+        
+        fn category_matches(case: &CaseNFT, category: Category) -> bool {
+            match category {
+                Category::Scam | Category::Web | Category::Person | Category::ConspiracyTheory | Category::Others => {
+                    case.category == category
+                },
+                Category::All => true
+            }
+        }
+        
+        fn status_matches(case: &CaseNFT, status: Status) -> bool {
+            match status {
+                Status::New | Status::Evidence | Status::Voting | Status::Close => {
+                    case.status == status
+                },
+                Status::All => true
+            }
         }
     }
 }
