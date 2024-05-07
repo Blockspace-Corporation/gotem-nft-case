@@ -22,6 +22,7 @@ pub mod case {
     #[ink(storage)]
     pub struct Case {
         pub case: BTreeMap<Id, CaseNFT>,
+        pub contract_owner: AccountId,
     }
 
     #[derive(Encode, Decode, Debug)]
@@ -93,9 +94,10 @@ pub mod case {
 
     impl Case {
         #[ink(constructor, payable)]
-        pub fn new() -> Self {
+        pub fn new(contract_owner: AccountId) -> Self {
             Self {
                 case: BTreeMap::new(),
+                contract_owner,
             }
         }
 
